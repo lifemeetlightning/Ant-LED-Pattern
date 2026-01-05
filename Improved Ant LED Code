@@ -1,0 +1,178 @@
+////////////////////////// BETTER, PEW! PEW! LIGHTS! //////////////////////////////
+///// ANTS, CHASER LIGHTS? Errr..  whatever we decided to call this pattern. //////
+///////////////////////////////////////////////////////////////////////////////////
+// The major change with this version compared to the original
+// is that now we have a 'brainz' array that I'm populating with 1's and
+// 0's in the setup to determine the on and off state of the lights of our
+// light strip. Instead of writing just the lights we want to change like 
+// we did before, we are now writing every LED on the light
+// strip with each iteration of our FastLED.show() command. We are shifting
+// the starting point of each iteration, the 'index' variable, by one every
+// iteration and then reading brainz[index] to determine what to write to
+// the LED strip. It makes it easier to switch directions based 
+// on user input - a push button in this case. This project was done with an 
+// Arduino Nano v3, a WS2812B light strip, and the FastLED library. Arduino IDE 
+// version 1.8.13. 
+// NUM_LEDS/(BLOCK_SIZE + GAP_SIZE) must divide evenly still with no remainder 
+// ONLY IF you are going to auto populate the brainz[] array in the setup section 
+// based on BLOCK_SIZE and GAP_SIZE. You can now also MANUALLY define the brainz[] 
+// array for a custom or asynchronous pattern. I've left an example commented out. 
+// You'll need to uncomment and then comment out the section in setup that auto-
+// populates the brainz[] array. BLOCK_SIZE and GAP_SIZE may still be adjusted, 
+// same as the previous code. DELAY_TIME may be adjusted as well, and the colors 
+// RED, GREEN, and BLUE may be adjusted along with RED_GAP, GREEN_GAP, and BLUE_GAP. 
+// For more details, watch the tutorial video:
+// YouTube.com/LifeMeetLightning
+// https://www.youtube.com/watch?v=Bz8nG_Qe-n0
+/////////////////////////////////////////////////////////////////////////////////// 
+#include <FastLED.h>    //Need the FastLED library!   
+#define NUM_LEDS 60     //How many lights are on your light strip.
+#define DATA_PIN 2      //Which pin on your arduino is sending out light strip data.
+#define COLOR_ORDER GRB //Green (G), Red (R), Blue (B).
+#define CHIPSET WS2812B //What type of light strip you are using.
+#define BRIGHTNESS 60   //How bright your light strip will display. 
+#define VOLTS 5         //Working voltage of your light strip.
+#define MAX_AMPS 500    //Limits how much current your light strip will draw.
+                        //This setting overides the BRIGHTNESS setting.
+#define BUTTON 3        //Sets pin number for the push button.
+
+//////////Adjustable Section//////////
+uint8_t BLOCK_SIZE = 5;     //How long the light blocks are.
+uint8_t GAP_SIZE = 10;      //How long the gaps between light blocks are.
+uint16_t DELAY_TIME = 100;  //How fast the blocks travel down the light strip.
+uint8_t RED = 0;            //Mix and match these color values in the range of
+uint8_t GREEN = 0;          //0 to 255 to customize the color of your 
+uint8_t BLUE = 255;         //light blocks.
+uint8_t RED_GAP = 0;        //I meant these to be 'Black' (values of 0) for
+uint8_t GREEN_GAP = 0;      //the gaps between light blocks, but they can be
+uint8_t BLUE_GAP = 0;       //colored as well! Woot! Options. 
+//////////////////////////////////////
+
+//////////Fun variables!//////////
+bool flip_flop = false;       //I'm now using this variable to determine 'Forwards' or 'Backwards'
+                              //running state of the LED's
+CRGB leds[NUM_LEDS];          //Array declaration in the CRGB type. FastLED library uses this.
+/////////////////////////////////
+
+//////////////////  Added Variables for "Better Ants" code!  //////////////////
+// Below is the custom defined brainz[] array example. Add or change 1's and 0's to 
+// match the pattern you want and length of your light strip. Be sure that 'NUM_LEDS' still
+// matches the length of the brainz[] array and comment out the 'for' loop in Setup section that
+// populates the brainz[] array automatically. 
+// You could also change the values within the brainz array dynamically in the code for some cool
+// patterns! Or add more logic to change the colors of the LED's based on the value it reads in the
+// brainz[] array (doesn't have to be just 1's and 0's).
+  
+//uint8_t brainz[] = {1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0};   //zombies?
+uint8_t brainz[NUM_LEDS];      //This array stores values that we use to determine states of the LED's
+int index;                     //This variable is what we use to index through the brainz[] array.  
+bool button_debounce = false;  //Bouncy, bouncy buttons. No more bouncy. 
+///////////////////////////////////////////////////////////////////////////////
+void setup() {
+  //Serial.begin(9600);        //Uncomment for troubleshooting in the Serial monitor.
+  //FastLED setup nonsense. 
+  FastLED.addLeds<CHIPSET,DATA_PIN,COLOR_ORDER>(leds,NUM_LEDS);
+  FastLED.setMaxPowerInVoltsAndMilliamps(VOLTS,MAX_AMPS);
+  FastLED.setBrightness(BRIGHTNESS);
+  FastLED.clear();
+  FastLED.show();
+  pinMode(BUTTON,INPUT_PULLUP);     //Sets my push button attached to pin 3 as an input with internal pullup resistor.
+                                    //Active LOW. Expects connection to ground to 'activate' pin.
+  if (flip_flop == true) {          //Sets index to the appropriate value for running forwards or backwards based on
+    index = 0;                      //state of flip_flop variable.
+  }
+  if (flip_flop == false) {
+   index = NUM_LEDS - 1;
+  }
+
+/////////////// Comment out this section if manually populating brainz[] array. ///////////////////  
+  for (int j=0; j<NUM_LEDS/(GAP_SIZE + BLOCK_SIZE); j++) {   //Auto-populates the brainz[] array 
+    for (int i=0; i<BLOCK_SIZE; i++) {                       //based on the BLOCK_SIZE and GAP_SIZE values.
+      brainz[i+((BLOCK_SIZE+GAP_SIZE)*j)] = 1;               //NUM_LEDS must be divisible evenly by 
+    }                                                        //BLOCK_SIZE + GAP_SIZE if auto-populating.
+    for (int i=0; i<GAP_SIZE; i++) {
+      brainz[i+(BLOCK_SIZE*(j+1))+(GAP_SIZE*j)] = 0;
+    }    
+  }
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+}
+void loop() { 
+/////////////////// Button ONE-SHOT Section //////////////////// 
+ if (digitalRead(BUTTON) == LOW && button_debounce == false) {  
+    flip_flop=!flip_flop;         //Reverses state of flip_flop variable then
+    button_debounce = true;       //reads button only once when it is pressed.
+    if (flip_flop == true) {    
+      index++;                    //'if' statements undo the index increment
+    }                             //or decrement that just occurred at the end
+    if (flip_flop == false) {     //of the code for changing direction.
+      index--;
+    }    
+  }
+  if (digitalRead(BUTTON) == HIGH && button_debounce == true) {
+    button_debounce = false;      //Resets when button is released.
+  }
+///////////////////////////////////////////////////////////////  
+
+////////////// The Ants Go Marching Forwards /////////////////
+  if (flip_flop == true) { 
+    
+// 'for' loops write every LED on the light strip
+// before moving on to the rest of the sketch.
+    
+    for (int i=0; i<NUM_LEDS; i++) {
+      if (index == NUM_LEDS) {                        //Occasionally, the index++ increment at the end of the code causes
+        index = 1;                                    //us to enter into the 'for' loop when index equals NUM_LEDS. This
+      }                                               //ensures we never read past the end of our brainz[] array.
+          
+      if (brainz[index]==1) {                         //These next 'if' statements determine whether we write the LED's 
+        leds[i].setRGB(RED,GREEN,BLUE);               //'on' or 'off'. There's expansion potential here. You can add 
+      }                                               //more RED, GREEN, BLUE type variables and more 'if' statements to write
+      if (brainz[index]==0) {                         //the LED's many different colors based on different values in the 
+        leds[i].setRGB(RED_GAP,GREEN_GAP,BLUE_GAP);   //brainz[] array (doesn't have to be just 1's and 0's). 
+      }
+      index++;                     //Our 'index' through the brainz[] array. Have to increment after every 'for' loop cycle.
+      if (index >= NUM_LEDS) {     //Resets 'index' back to zero when the index++ increment makes it equal NUM_LEDS.
+        index = 0;                 //Don't want to read past the end of our brainz[] array.
+      }
+    
+    }
+    
+  }
+///////////////////////////////////////////////////////////////
+
+////////////// The Ants Go Marching Backwards /////////////////
+  if (flip_flop == false) {
+    
+    for (int i=NUM_LEDS - 1; i>-1; i--) { 
+      if (index == -1) {                     
+        index = NUM_LEDS - 2;
+      }
+    
+      if (brainz[index]==1) {                
+        leds[i].setRGB(RED,GREEN,BLUE);
+      }
+      if (brainz[index]==0) {
+        leds[i].setRGB(RED_GAP,GREEN_GAP,BLUE_GAP);
+      }
+   
+      index--;
+      if (index <= -1) {
+        index = NUM_LEDS - 1;
+      }
+    
+    }
+  }
+  FastLED.show();              //Yahoo. 
+  delay(DELAY_TIME);           //How fast the ants be moving. Aargh.
+  if (flip_flop == true) {     //This is the magic that actually makes the LED's move down the strip.
+    index++;                   //Every 'for' loop iteration leaves 'index' back where we started.
+  }                            //We must increment or decrement index so that when we go back into
+                               //the 'for' loop again, index is offset by one place value. 
+  if (flip_flop == false) {
+    index--;
+  }
+  
+///////////////////////////////////////////////////////////////
+
+}
